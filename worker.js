@@ -1,8 +1,8 @@
-const ALLOWED_HOSTS = [
-  "example.com"
-];
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const ALLOWED_HOSTS = [
+  "files.example.com"
+];
 
 function corsHeaders() {
   return {
@@ -30,9 +30,9 @@ export default {
       });
     }
 
-    const url = new URL(request.url);
+    const requestUrl = new URL(request.url);
 
-    if (url.pathname !== "/api/download") {
+    if (requestUrl.pathname !== "/api/download") {
       return json({ error: "Not found." }, 404);
     }
 
@@ -45,18 +45,18 @@ export default {
       const mediaUrl = String(body.mediaUrl || "").trim();
 
       if (!mediaUrl) {
-        return json({ error: "Media URL is required." }, 400);
+        return json({ error: "Please provide a media URL." }, 400);
       }
 
       const media = new URL(mediaUrl);
 
       if (!["http:", "https:"].includes(media.protocol)) {
-        return json({ error: "Invalid media URL." }, 400);
+        return json({ error: "Invalid URL." }, 400);
       }
 
       if (!ALLOWED_HOSTS.includes(media.hostname)) {
         return json({
-          error: "This media source is not supported."
+          error: "This media host is not supported."
         }, 403);
       }
 
@@ -64,17 +64,25 @@ export default {
 
       if (!response.ok) {
         return json({
-          error: "Media could not be fetched."
+          error: "The media file could not be fetched."
         }, 502);
       }
 
-      const contentLength = Number(
-        response.headers.get("content-length") || 0
-      );
+      const contentType =
+        response.headers.get("content-type") || "";
+
+      if (!contentType.startsWith("video/")) {
+        return json({
+          error: "The URL does not point to a video file."
+        }, 400);
+      }
+
+      const contentLength =
+        Number(response.headers.get("content-length") || 0);
 
       if (contentLength > MAX_FILE_SIZE) {
         return json({
-          error: "File is too large."
+          error: "Video is larger than 50 MB."
         }, 413);
       }
 
@@ -82,7 +90,7 @@ export default {
 
       headers.set(
         "Content-Disposition",
-        'attachment; filename="download.mp4"'
+        'attachment; filename="video.mp4"'
       );
 
       headers.set("Access-Control-Allow-Origin", "*");
@@ -92,7 +100,7 @@ export default {
         headers
       });
 
-    } catch (error) {
+    } catch {
       return json({
         error: "Invalid request."
       }, 400);
